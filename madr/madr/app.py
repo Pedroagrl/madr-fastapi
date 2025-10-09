@@ -1,12 +1,14 @@
 from http import HTTPStatus
-from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy import select
 
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from madr.models import User
-from madr.schemas import Message, UserDB, UserList, UserPublic, UserSchema
 
 from madr.database import get_session
+from madr.models import User
+from madr.schemas import Message, UserList, UserPublic, UserSchema
+from madr.security import get_password_hash
 
 app = FastAPI()
 
@@ -27,17 +29,19 @@ def create_user(user: UserSchema, session=Depends(get_session)):
     if db_user:
         if db_user.username == user.username:
             raise HTTPException(
-                status_code = HTTPStatus.BAD_REQUEST,
-                detail = 'Username already exists',
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail='Username already exists',
             )
         elif db_user.email == user.email:
             raise HTTPException(
-                status_code = HTTPStatus.BAD_REQUEST,
-                detail = 'Email already exists',
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail='Email already exists',
             )
-            
+
     db_user = User(
-        username=user.username, email=user.email, password=user.password
+        username=user.username,
+        email=user.email,
+        password=get_password_hash(user.password)
     )
 
     session.add(db_user)
@@ -49,12 +53,12 @@ def create_user(user: UserSchema, session=Depends(get_session)):
 
 @app.get('/users/', response_model=UserList)
 def read_users(
-    #Um recurso para limitar e mostrar certa quantidade de registros.
+    # Um recurso para limitar e mostrar certa quantidade de registros.
     limit: int = 10,
-    #Dita de onde vai começar a contar o limit
+    # Dita de onde vai começar a contar o limit
     skip: int = 0,
     session: Session = Depends(get_session)
-    
+
     ):
     user = session.scalars(
         select(User).limit(limit).offset(skip)
@@ -69,16 +73,22 @@ def update_user(user_id: int, user: UserSchema, session: Session = Depends(get_s
     )
     if not db_user:
         raise HTTPException(
-            status_code=HTTPException.NOT_FOUND, detail='User not found'
+            status_code=HTTPStatus.NOT_FOUND, detail='User not found'
         )
-    
-    db_user.email == user.email
-    db_user.username == user.username
-    db_user.password == user.password
+    try:
+        db_user.username = user.username
+        db_user.password = user.password
+        db_user.email = user.email
+        session.commit()
+        session.refresh(db_user)
 
-    session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
+        return db_user
+
+    except IntegrityError:
+        raise HTTPException(
+            status_code=HTTPStatus.CONFLICT,
+            detail='Username or Email already exists',
+        )
 
     return db_user
 
@@ -95,14 +105,4 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
     session.delete(db_user)
     session.commit()
 
-    return{'message': 'User deleted'}
-
-
-@app.get('/users/{user_id}', response_model=UserPublic)
-def read_user__exercicio(user_id: int):
-    if user_id > len(database) or user_id < 1:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='User not found'
-        )
-
-    return database[user_id - 1]
+    return {'message': 'User deleted'}

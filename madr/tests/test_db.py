@@ -1,6 +1,7 @@
+from sqlalchemy import select
+
 from madr.models import User
 
-from sqlalchemy import select
 
 def test_create_user(session):
     user = User(
