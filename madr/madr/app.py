@@ -3,12 +3,14 @@ from http import HTTPStatus
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import Session
 from madr.database import get_session
 from madr.models import User
+
 from madr.schemas import Message, UserList, UserPublic, UserSchema
-from madr.security import get_password_hash
+from madr.security import get_password_hash, verify_password
+from fastapi.security import OAuth2PasswordRequestForm
 
 app = FastAPI()
 
@@ -106,3 +108,17 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
     session.commit()
 
     return {'message': 'User deleted'}
+
+@app.post('/token')
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session)
+):
+    user = session.scalar(
+        select(User).where(User.email == form_data.username)
+    )
+
+    if not user or not verify_password(form_data.password, user.password):
+        raise HTTPException(
+            status_code=400, detail='Incorrect email or password'
+        )
