@@ -57,7 +57,7 @@ def create_user(user: UserSchema, session=Depends(get_session)):
 def read_users(
     # Um recurso para limitar e mostrar certa quantidade de registros.
     limit: int = 10,
-    # Dita de onde vai começar a contar o limit
+    # Dita de onde vai começar a contar o limit.
     skip: int = 0,
     session: Session = Depends(get_session)
 
@@ -91,8 +91,6 @@ def update_user(user_id: int, user: UserSchema, session: Session = Depends(get_s
             status_code=HTTPStatus.CONFLICT,
             detail='Username or Email already exists',
         )
-
-    return db_user
 
 
 @app.delete('/users/{user_id}', response_model=Message)
