@@ -7,6 +7,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from madr.security import get_password_hash
+
 from madr.app import app
 from madr.database import get_session
 from madr.models import User, table_registry
@@ -61,9 +63,12 @@ def mock_db_time():
 
 @pytest.fixture
 def user(session):
-    user = User(username='Teste', email='teste@test.com', password='testtest')
+    pwd = 'testtest'
+    user = User(username='Teste', email='teste@test.com', password=get_password_hash(pwd))
     session.add(user)
     session.commit()
     session.refresh(user)
 
+    user.clean_password = pwd
+    
     return user

@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from madr.database import get_session
 from madr.models import User
 
-from madr.schemas import Message, UserList, UserPublic, UserSchema
-from madr.security import get_password_hash, verify_password
+from madr.schemas import Message, UserList, UserPublic, UserSchema, Token
+from madr.security import get_password_hash, verify_password, create_access_token
 from fastapi.security import OAuth2PasswordRequestForm
 
 app = FastAPI()
@@ -107,7 +107,7 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
 
     return {'message': 'User deleted'}
 
-@app.post('/token')
+@app.post('/token', response_model=Token)
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
@@ -120,3 +120,7 @@ def login_for_access_token(
         raise HTTPException(
             status_code=400, detail='Incorrect email or password'
         )
+    
+    access_token = create_access_token(data={'sub': user.email})
+
+    return{'access_token': access_token, 'token_type': 'Bearer'}
